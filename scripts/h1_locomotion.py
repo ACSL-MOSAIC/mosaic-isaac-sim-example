@@ -61,6 +61,10 @@ from isaaclab_rl.utils.pretrained_checkpoint import get_published_pretrained_che
 
 from isaaclab_tasks.manager_based.locomotion.velocity.config.h1.rough_env_cfg import H1RoughEnvCfg_PLAY
 
+from mosaic_core import auto_configurer
+from scripts.connector.h1_directioning import H1DirectionConnectorConfigurerFactory
+from scripts.h1_auto_configurer import H1AutoConfigurer
+
 TASK = "Isaac-Velocity-Rough-H1-v0"
 RL_LIBRARY = "rsl_rl"
 
@@ -132,15 +136,24 @@ class H1RoughDemo:
         self._input = carb.input.acquire_input_interface()
         self._keyboard = omni.appwindow.get_default_app_window().get_keyboard()
         self._sub_keyboard = self._input.subscribe_to_keyboard_events(self._keyboard, self._on_keyboard_event)
-        T = 1
-        R = 0.5
+        self.T = 1.0  # linear velocity magnitude
+        self.R = 0.5  # angular velocity magnitude
         self._key_to_control = {
-            "UP": torch.tensor([T, 0.0, 0.0, 0.0], device=self.device),
+            "UP": torch.tensor([self.T, 0.0, 0.0, 0.0], device=self.device),
             "DOWN": torch.tensor([0.0, 0.0, 0.0, 0.0], device=self.device),
-            "LEFT": torch.tensor([T, 0.0, 0.0, -R], device=self.device),
-            "RIGHT": torch.tensor([T, 0.0, 0.0, R], device=self.device),
+            "LEFT": torch.tensor([self.T, 0.0, 0.0, -self.R], device=self.device),
+            "RIGHT": torch.tensor([self.T, 0.0, 0.0, self.R], device=self.device),
             "ZEROS": torch.tensor([0.0, 0.0, 0.0, 0.0], device=self.device),
         }
+
+    def from_mosaic_direction(self, direction: dict):
+        """Sets the command for the selected robot based on external direction input."""
+        if self._selected_id is not None:
+            lin_vel_x = direction.get("lin_vel_x", 0.0) * self.T
+            ang_vel_yaw = direction.get("ang_vel_yaw", 0.0) * self.R
+            self.commands[self._selected_id] = torch.tensor(
+                [lin_vel_x, 0.0, 0.0, ang_vel_yaw], device=self.device
+            )
 
     def _on_keyboard_event(self, event):
         """Checks for a keyboard event and assign the corresponding command control depending on key pressed."""
@@ -211,7 +224,16 @@ class H1RoughDemo:
 
 def main():
     """Main function."""
+
+    # 팩토리 객체를 변수로 유지 (타입 정보 보존)
+    h1_direction_factory = H1DirectionConnectorConfigurerFactory()
+    auto_configurer.register_configurable_connector(h1_direction_factory)
+
     demo_h1 = H1RoughDemo()
+
+    auto_conf = H1AutoConfigurer(demo_h1)
+    auto_conf.auto_configure('./mosaic_config.yaml')
+
     obs, _ = demo_h1.env.reset()
     while simulation_app.is_running():
         # check for selected robots
