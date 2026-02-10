@@ -63,6 +63,7 @@ from isaaclab_tasks.manager_based.locomotion.velocity.config.h1.rough_env_cfg im
 
 from mosaic_core import auto_configurer
 from scripts.connector.h1_directioning import H1DirectionConnectorConfigurerFactory
+from scripts.connector.h1_camera import H1CameraConnectorConfigurerFactory
 from scripts.h1_auto_configurer import H1AutoConfigurer
 
 TASK = "Isaac-Velocity-Rough-H1-v0"
@@ -95,8 +96,8 @@ class H1RoughDemo:
         env_cfg.scene.num_envs = 1
         env_cfg.episode_length_s = 1000000
         env_cfg.curriculum = None
-        env_cfg.commands.base_velocity.ranges.lin_vel_x = (0.0, 1.0)
-        env_cfg.commands.base_velocity.ranges.heading = (-1.0, 1.0)
+        env_cfg.commands.base_velocity.ranges.lin_vel_x = (0.0, 0.0)
+        env_cfg.commands.base_velocity.ranges.heading = (0.0, 0.0)
         # wrap around environment for rsl-rl
         self.env = RslRlVecEnvWrapper(ManagerBasedRLEnv(cfg=env_cfg))
         self.device = self.env.unwrapped.device
@@ -154,6 +155,21 @@ class H1RoughDemo:
             self.commands[self._selected_id] = torch.tensor(
                 [lin_vel_x, 0.0, 0.0, ang_vel_yaw], device=self.device
             )
+
+    def get_camera_image(self):
+        """Captures the current image from the third-person view camera."""
+        if self.viewport.get_active_camera() != self.camera_path:
+            return None
+
+        width, height = self.viewport.get_viewport_size()
+        rgba_data = self.viewport.capture_rgba(width, height)
+        if rgba_data is None:
+            return None
+
+        # Convert to H x W x C and then to torch tensor
+        rgba_data = rgba_data.reshape((height, width, 4))
+        rgba_tensor = torch.from_numpy(rgba_data).permute(2, 0, 1)  # C x H x W
+        return rgba_tensor
 
     def _on_keyboard_event(self, event):
         """Checks for a keyboard event and assign the corresponding command control depending on key pressed."""
@@ -227,7 +243,9 @@ def main():
 
     # 팩토리 객체를 변수로 유지 (타입 정보 보존)
     h1_direction_factory = H1DirectionConnectorConfigurerFactory()
+    h1_camera_factory = H1CameraConnectorConfigurerFactory()
     auto_configurer.register_configurable_connector(h1_direction_factory)
+    auto_configurer.register_configurable_connector(h1_camera_factory)
 
     demo_h1 = H1RoughDemo()
 

@@ -13,8 +13,8 @@ class H1DirectionDataChannel(handlers.data_channel.DataChannelJsonReceivable):
 
         # 테스트용: 백그라운드 스레드에서 1초마다 handle_data 호출
         print(f"[H1DirectionDataChannel] Starting test loop for channel: {channel_name}")
-        self.test_thread = threading.Thread(target=self._test_loop, daemon=True)
-        self.test_thread.start()
+        # self.test_thread = threading.Thread(target=self._test_loop, daemon=True)
+        # self.test_thread.start()
 
     def _test_loop(self):
         """테스트용: 1초마다 handle_data 호출"""
