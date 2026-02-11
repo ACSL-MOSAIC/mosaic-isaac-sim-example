@@ -32,7 +32,6 @@ class H1CameraMediaTrack(handlers.media_track.AMediaTrackHandler):
         self.set_running(False)
 
     def _loop(self):
-        """테스트용: 1초마다 handle_data 호출"""
         while self.get_stop_flag():
             time.sleep(0.1)  # 0.1 초 대기 (10Hz)
             image = self.h1_demo.get_camera_image()

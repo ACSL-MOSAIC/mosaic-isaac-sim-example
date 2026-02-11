@@ -64,6 +64,7 @@ from isaaclab_tasks.manager_based.locomotion.velocity.config.h1.rough_env_cfg im
 from mosaic_core import auto_configurer
 from scripts.connector.h1_directioning import H1DirectionConnectorConfigurerFactory
 from scripts.connector.h1_camera import H1CameraConnectorConfigurerFactory
+from scripts.connector.h1_imu_state import H1IMUStateConnectorConfigurerFactory
 from scripts.h1_auto_configurer import H1AutoConfigurer
 
 TASK = "Isaac-Velocity-Rough-H1-v0"
@@ -171,6 +172,39 @@ class H1RoughDemo:
         rgba_tensor = torch.from_numpy(rgba_data).permute(2, 0, 1)  # C x H x W
         return rgba_tensor
 
+    def get_imu_data(self):
+        """Gets IMU sensor data from the robot."""
+        if self._selected_id is None:
+            return None
+
+        # Isaac Lab 환경에서 IMU 데이터는 일반적으로 sensors 딕셔너리에 있습니다
+        try:
+            if hasattr(self.env.unwrapped.scene, 'sensors') and 'imu' in self.env.unwrapped.scene.sensors:
+                imu_sensor = self.env.unwrapped.scene.sensors['imu']
+                return {
+                    'angular_velocity': imu_sensor.data.ang_vel[self._selected_id].cpu().numpy(),
+                    'linear_acceleration': imu_sensor.data.lin_acc[self._selected_id].cpu().numpy(),
+                    'orientation': imu_sensor.data.quat_w[self._selected_id].cpu().numpy() if hasattr(imu_sensor.data, 'quat_w') else None
+                }
+        except Exception as e:
+            print(f"[IMU] Sensor access failed: {e}")
+
+        # 대안: 환경의 root state에서 직접 읽기
+        try:
+            root_state = self.env.unwrapped.scene.articulations['robot'].data.root_state_w
+            root_ang_vel = self.env.unwrapped.scene.articulations['robot'].data.root_ang_vel_w
+            root_lin_vel = self.env.unwrapped.scene.articulations['robot'].data.root_lin_vel_w
+
+            return {
+                'angular_velocity': root_ang_vel[self._selected_id].cpu().numpy(),
+                'linear_acceleration': root_lin_vel[self._selected_id].cpu().numpy(),  # 속도이지만 근사값
+                'position': root_state[self._selected_id, :3].cpu().numpy(),
+                'orientation': root_state[self._selected_id, 3:7].cpu().numpy()  # quaternion
+            }
+        except Exception as e:
+            print(f"[IMU] Root state access failed: {e}")
+            return None
+
     def _on_keyboard_event(self, event):
         """Checks for a keyboard event and assign the corresponding command control depending on key pressed."""
         if event.type == carb.input.KeyboardEventType.KEY_PRESS:
@@ -244,8 +278,10 @@ def main():
     # 팩토리 객체를 변수로 유지 (타입 정보 보존)
     h1_direction_factory = H1DirectionConnectorConfigurerFactory()
     h1_camera_factory = H1CameraConnectorConfigurerFactory()
+    h1_imu_state_factory = H1IMUStateConnectorConfigurerFactory()
     auto_configurer.register_configurable_connector(h1_direction_factory)
     auto_configurer.register_configurable_connector(h1_camera_factory)
+    auto_configurer.register_configurable_connector(h1_imu_state_factory)
 
     demo_h1 = H1RoughDemo()
 
@@ -253,6 +289,10 @@ def main():
     auto_conf.auto_configure('./mosaic_config.yaml')
 
     obs, _ = demo_h1.env.reset()
+
+    # IMU 데이터 출력용 카운터
+    imu_print_counter = 0
+
     while simulation_app.is_running():
         # check for selected robots
         demo_h1.update_selected_object()
@@ -261,6 +301,12 @@ def main():
             obs, _, _, _ = demo_h1.env.step(action)
             # overwrite command based on keyboard input
             obs[:, 9:13] = demo_h1.commands
+
+        # IMU 데이터 주기적으로 출력 (60프레임마다 = 약 1초)
+        imu_print_counter += 1
+        if imu_print_counter >= 60:
+
+            imu_print_counter = 0
 
 
 if __name__ == "__main__":

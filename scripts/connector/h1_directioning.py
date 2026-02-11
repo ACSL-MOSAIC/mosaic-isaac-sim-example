@@ -11,13 +11,11 @@ class H1DirectionDataChannel(handlers.data_channel.DataChannelJsonReceivable):
         self.h1_demo = h1_demo
         self.running = True
 
-        # 테스트용: 백그라운드 스레드에서 1초마다 handle_data 호출
         print(f"[H1DirectionDataChannel] Starting test loop for channel: {channel_name}")
         # self.test_thread = threading.Thread(target=self._test_loop, daemon=True)
         # self.test_thread.start()
 
     def _test_loop(self):
-        """테스트용: 1초마다 handle_data 호출"""
         counter = 0
         while self.running:
             time.sleep(1)
@@ -42,7 +40,7 @@ class H1DirectionDataChannel(handlers.data_channel.DataChannelJsonReceivable):
 class H1DirectionConnectorConfigurer(auto_configurer.ADCHandlerConfigurer):
     def __init__(self):
         super().__init__()
-        self.h1_demo = None  # H1ConnectorConfigurer 기능 직접 구현
+        self.h1_demo = None
 
     def set_h1_demo(self, h1_demo):
         self.h1_demo = h1_demo
