@@ -18,7 +18,7 @@ This project/repository provides an example of applying the [mosaic system](http
 - After building the `mosaic-core` library, with a python interpreter that has Isaac Lab installed, install the library in editable mode using:
     ```bash
     # use 'PATH_TO_isaaclab.sh|bat -p' instead of 'python' if Isaac Lab is not installed in Python venv or conda
-    python -m pip install -e mosaic-core/build/
+    python -m pip install -e mosaic-core/build/python
     ```
 
 ## Setup Mosaic Configuration yaml File
